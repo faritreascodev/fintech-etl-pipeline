@@ -37,4 +37,6 @@ El motor matemático central extrae información contextual profundizando en la 
 - **Gestión Cloud-Native Agnostic:** Preparado para correr como contenedor sin exponer dependencias IAM cerradas y capaz de emitir *data-docs* hacia almacenamiento de objetos o entornos on-prem analíticos.
 
 ---
-*Hecho por Farit Reasco.*
+*Desarrollado y Supervisado por:*  
+- Farit Alexander Reasco Torres (fareasco@pucese.edu.ec)
+- Andres Ricardo Guanoluisa Plasencia (arguanoluisa@pucese.edu.ec)
