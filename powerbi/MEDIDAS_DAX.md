@@ -1,4 +1,4 @@
-# 📊 Fórmulas DAX Profesionales para Portafolios (Nivel Arquitecto BI)
+# Fórmulas DAX Profesionales para Portafolios (Nivel Arquitecto BI)
 
 Estas métricas son el complemento de Business Intelligence. Se montan directamente sobre tus nuevos archivos Parquet consumiendo un mínimo de RAM, usando **Time Intelligence** algorítmica.
 
