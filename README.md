@@ -1,6 +1,6 @@
 # FinTech ETL: Analítica y Riesgo de Portafolios
 
-Arquitectura moderna, ligera y completamente automatizada para el análisis de portafolios financieros. Este repositorio contiene un proceso ETL idempotente desarrollado en Python, diseñado para transformar datos crudos en artefactos analíticos de alta calidad, óptimos para herramientas de Inteligencia de Negocios como Power BI.
+Arquitectura columnar, modular e idempotente para el análisis de riesgo de portafolios financieros. Este repositorio contiene un proceso ETL riguroso desarrollado en Python, diseñado para transformar datos transaccionales asíncronos en artefactos pre-computados de alto rendimiento (**Apache Parquet**), óptimos para exprimir la *Time Intelligence* de Power BI.
 
 ## Arquitectura del Sistema y Flujo de Datos
 
@@ -18,7 +18,7 @@ El diseño sigue una separación estricta en tres capas, garantizando la **idemp
    - **Saneo Matemático Universal:** Prevención estricta de divisiones por cero o ruido analítico, al aislar transiciones sin capital previo, sanear valores `NaN` e `Inf`, y rebasear los acumulados relacionales a 1.0.
 
 3. **Capa de Salida (Load)**
-   - **Artefactos Estables:** Exportación en módulos CSV independientes (`cartera_diaria.csv`, `posiciones_diarias.csv`, `exposicion_sector.csv`). Esto desacopla las entidades analíticas para evitar re-escrituras masivas o cuellos de botella semánticos en el BI.
+   - **Artefactos Columnares (Apache Parquet):** Exportación en módulos supercomprimidos independientes (`cartera_diaria.parquet`, `posiciones_diarias.parquet`, etc.). Esto comprime el peso de lectura un $80\%$ y preserva los *types* nativos evitando costosos pasos de formateo cruzado (*Power Query*) en los reportes de BI.
    - **Trazabilidad de la Calidad:** Modelado preparado para adjuntar reportes de Data Quality y `hashes` por artefacto, posibilitando auditoría continua.
 
 ## Métricas Financieras y de Riesgo
@@ -32,9 +32,22 @@ El motor matemático central extrae información contextual profundizando en la 
 
 ## Características Técnicas
 
-- **Core Pandas sin Apply:** Stack principal en Python con Pandas implementando rellenados y cruces puramente vectorizados.
-- **Data Quality In-memory:** Cláusulas de chequeo `assert` (e.g. asegurando llaves únicas uniendo la fecha e ID de cuenta, y bloqueando el despliegue si algún capital `valor_cartera` rompe el espacio flotante y figura como NA). 
-- **Gestión Cloud-Native Agnostic:** Preparado para correr como contenedor sin exponer dependencias IAM cerradas y capaz de emitir *data-docs* hacia almacenamiento de objetos o entornos on-prem analíticos.
+- **Ingeniería Modular Pura:** Refactorización orientada a objetos hacia un esquema productivo clásico (`extract.py`, `transform.py`, `load.py`), posibilitando Tests Unitarios en un futuro.
+- **Core Pandas sin Apply:** Stack principal en Python con Pandas implementando rellenados y cruces de precios en la serie de tiempo puramente vectorizados.
+- **Gestión Cloud-Native Agnostic:** Sistema desacoplado y libre de llaves privadas duras; listo para orquestarlo en instancias Dockerizadas (Cloud Run / Apache Airflow).
+
+## Uso Rápido del Repositorio
+
+La arquitectura no depende de Jupyter Notebooks para la producción. El orquestador general está listo para dispararse:
+
+```bash
+# 1. Instalar las dependencias core
+pip install pandas numpy pyarrow requests openpyxl
+
+# 2. Prender el motor ETL 
+python src/main.py
+```
+> El resultado de grado analítico se emitirá en la raíz de la carpeta `data/out_parquet/`.
 
 ---
 *Desarrollado y Supervisado por:*  
