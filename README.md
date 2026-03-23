@@ -49,6 +49,13 @@ python src/main.py
 ```
 > El resultado de grado analítico se emitirá en la raíz de la carpeta `data/out_parquet/`.
 
+## Publicación Científica Oficial
+La fundamentación teórica de este framework, su optimización matemática y escalamiento hacia Parquet se documentan de forma académica a través de nuestros Manuscritos de Investigación:
+- 🇺🇸 [**English Version (PDF):** Columnar and Idempotent Architecture for Financial Risk Analysis](docs/Reasco_Columnar_Idempotent_Architecture_2026.pdf)
+- 🇪🇸 [**Versión en Español (PDF):** Arquitectura Columnar e Idempotente para Análisis de Riesgo Financiero](docs/Reasco_Arquitectura_Columnar_2026.pdf)
+
+> **Reproducibilidad Garantizada:** El código fuente completo, orquestador modular temporal y artefactos de visualización se encuentran preservados de forma íntegra en nuestro repositorio público: [**https://github.com/faritreascodev/fintech-etl-pipeline**](https://github.com/faritreascodev/fintech-etl-pipeline).
+
 ---
 *Desarrollado y Supervisado por:*  
 - Farit Alexander Reasco Torres (fareasco@pucese.edu.ec)
