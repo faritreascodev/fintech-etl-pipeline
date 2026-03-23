@@ -6,7 +6,7 @@ from load import save_to_parquet
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
 def run_pipeline():
-    logging.info("--- 🚀 INICIANDO ORQUESTACIÓN ETL FINTECH ---")
+    logging.info("INICIANDO ORQUESTACIÓN ETL FINTECH")
     
     # 1. EXTRACT
     raw_data = extract_from_excel("data/nuevo_dataset.xlsx")
@@ -23,7 +23,7 @@ def run_pipeline():
     save_to_parquet(exp_ticker, "exposicion_ticker")
     save_to_parquet(exp_sector, "exposicion_sector")
     
-    logging.info("--- PIPELINE EJECUTADO EXITOSAMENTE ---")
+    logging.info("PIPELINE EJECUTADO EXITOSAMENTE")
 
 if __name__ == "__main__":
     run_pipeline()
