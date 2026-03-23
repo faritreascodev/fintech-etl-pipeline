@@ -32,8 +32,7 @@
 \setlength{\floatsep}{6pt plus 1.0pt minus 2.0pt}
 \setlength{\intextsep}{6pt plus 1.0pt minus 2.0pt}
 
-% ==== Metadatos ====
-\title{Arquitectura ligera y reproducible para análisis de portafolios financieros: diseño, implementación y evaluación con Google Sheets, Python y Power~BI}
+\title{Arquitectura Columnar e Idempotente para Análisis de Riesgo Financiero: Diseño y Evaluación con Apache Parquet y Business Intelligence}
 
 \author{\IEEEauthorblockN{Farit Alexander Reasco Torres}
 \IEEEauthorblockA{Tecnología Superior en 
@@ -44,7 +43,7 @@ Desarrollo de Software / Pontificia Universidad Católica del Ecuador Sede Esmer
 
 % ========= Abstract =========
 \begin{abstract}
-Se presenta una arquitectura de analítica financiera orientada a portafolios que prioriza \emph{simplicidad operativa, reproducibilidad y bajo costo}. El flujo completo se apoya en tres pilares: (i) \emph{Google Sheets} como repositorio colaborativo publicado como CSV; (ii) un proceso ETL en \emph{Python/Pandas} (Google Colab o entorno local) que normaliza datos, valida reglas de calidad, calcula indicadores de desempeño y riesgo y genera artefactos listos para consumo; y (iii) \emph{Power~BI} como capa de visualización interactiva. El sistema evita dependencias de credenciales complejas y se diseña para ser idempotente: una misma entrada produce los mismos resultados, acompañados de huellas (\emph{hashes}) y metadatos que facilitan su trazabilidad. Se describe cómo se gestiona la densificación del calendario de precios, cómo se comparan portafolio e índice mediante \emph{rebase} y cómo se construyen visualizaciones de alto valor interpretativo (acumulados, distribución de retornos, volatilidad móvil, exposición sectorial, contribución de \emph{tickers}, \emph{drawdown} y estacionalidad de retornos). El caso de estudio, basado en hojas y CSV reales, confirma tiempos de refresco adecuados para el aula y el laboratorio, a la vez que mantiene criterios de calidad y transparencia alineados con buenas prácticas de inteligencia de negocios. Finalmente, se discuten limitaciones y una ruta de evolución hacia servicios, autenticación y orquestación.
+Se presenta una arquitectura de analítica financiera orientada a portafolios que prioriza \emph{simplicidad operativa, reproducibilidad y bajo costo}. El flujo completo se apoya en tres pilares: (i) \emph{repositorios colaborativos} para ingesta cruda; (ii) un proceso ETL modular en \emph{Python/Pandas} que normaliza datos, valida reglas de calidad, calcula indicadores de desempeño y riesgo y genera artefactos columnares \emph{Apache Parquet} listos para consumo; y (iii) \emph{Power~BI} como capa de visualización interactiva y de alta eficiencia en memoria. El sistema se diseña para ser idempotente: una misma entrada produce los mismos resultados, acompañados de huellas (\emph{hashes}) y metadatos que facilitan su trazabilidad. Se describe cómo se gestiona la densificación del calendario de precios, cómo se comparan portafolio e índice mediante \emph{rebase} y cómo se construyen métricas DAX de alto valor interpretativo (acumulados, volatilidad móvil a 21D, contribución de \emph{tickers}, \emph{drawdown} máximo y estacionalidad). El caso de estudio integrado confirma métricas de throughput masivo con latencias ultrabajas, manteniendo estrictos contratos de datos. Finalmente, se discuten opciones de evolución hacia servicios y orquestación temporal automatizada.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -57,7 +56,7 @@ En contextos universitarios y de emprendimiento, la analítica de inversiones co
 
 Abordamos dos problemas operativos: \textbf{heterogeneidad de datos} capturados por distintas personas y \textbf{comunicación clara del desempeño y del riesgo} a audiencias mixtas. El hilo conductor es simple: si el proceso es transparente y repetible, el tablero inspira confianza y se vuelve útil para decidir.
 
-El enfoque se apoya en tres ideas prácticas: (1) \textbf{separación por capas} (ingesta, procesamiento, presentación) para reducir acoplamiento; (2) \textbf{reglas explícitas} de limpieza y cálculo como “contratos” de datos; y (3) \textbf{artefactos pequeños y estables} —cada CSV cumple un propósito limitado (cartera, exposición, estadísticos, benchmark)— que aceleran el refresco y simplifican la depuración.
+El enfoque se apoya en tres ideas prácticas: (1) \textbf{separación por capas} (ingesta, procesamiento, presentación) para reducir acoplamiento; (2) \textbf{reglas explícitas} de limpieza y cálculo como “contratos” de datos bajo modulos de Python; y (3) \textbf{artefactos pequeños y estables} —cada objeto Parquet cumple un propósito limitado (cartera, exposición, estadísticos, benchmark)— que aceleran el refresco, aligeran en $80\%$ el disco duro y blindan los tipos de datos consumidos por BI.
 
 \textbf{Aporte.} Demostramos que este esquema mínimo cubre los objetivos clásicos de seguimiento de carteras: entender \emph{qué pasó}, \emph{por qué pasó} y \emph{dónde actuar}. Los resultados dialogan con la tradición de \emph{media--varianza} y con la lectura práctica de la volatilidad como proxy de riesgo, ampliamente discutidas en la literatura en español \cite{zapata2022,macias2020,ramirez2016,barbosa2019,gaona2020,novoa2019}.
 
@@ -105,7 +104,7 @@ Power~BI se diseña con tres páginas:
 \tikzstyle{box}=[rectangle, rounded corners, draw, thick, inner sep=6pt, align=center, fill=white]
 \node[box, fill=gray!10] (sheets) {Google Sheets\\(CSV público)};
 \node[box, right=of sheets, fill=blue!6] (etl) {Python \& Pandas\\Colab / Local (ETL)\\\footnotesize Limpieza, valorización,\\\footnotesize retornos \& métricas};
-\node[box, below=of etl, fill=orange!10] (cs) {Artefactos CSV\\\footnotesize cartera\_diaria, exposición,\\estadísticos, benchmark};
+\node[box, below=of etl, fill=orange!10] (cs) {Artefactos Parquet\\\footnotesize cartera\_diaria, exposición,\\estadísticos, benchmark};
 \node[box, right=of etl, fill=green!8] (pbi) {Power BI\\Dashboard};
 \node[box, above=of etl, fill=red!8] (dq) {Calidad de datos\\\footnotesize tipos, NAs/$\pm\infty$,\\densificación, rebase};
 \draw[-{Latex[length=3mm]}] (sheets) -- node[above]{CSV} (etl);
@@ -121,7 +120,7 @@ Power~BI se diseña con tres páginas:
 % ========= 4. Implementación técnica =========
 \section{Implementación técnica}
 \subsection{Artefactos y organización de carpetas}
-La carpeta de salida incluye archivos temáticos (cartera, exposición, estadísticos, benchmark) y un subdirectorio con figuras reproducibles en PNG y PDF. Cada archivo puede acompañarse de un \texttt{.meta.json} con fecha de ejecución, parámetros, \emph{hash} y versión del script. Esta organización permite rehacer el tablero en minutos y auditar cambios.
+La carpeta principal de la capa Load (\texttt{data/out\_parquet}) incluye archivos supercomprimidos estructuralmente limpios (cartera, exposición, estadísticos, benchmark). Cada archivo puede acompañarse de un \texttt{.meta.json} con fecha de ejecución, parámetros, \emph{hash} y versión del script modular. Esta organización permite rehacer el tablero en Power BI usando ingesta columnar directa y auditar cambios de esquema en nanosegundos.
 
 \subsection{Estrategias de limpieza y normalización}
 Además de convertir tipos, el proceso toma decisiones que evitan sesgos:
@@ -411,7 +410,7 @@ Con base en el donut sectorial y el Top-10, si “Semiconductores” concentra 4
 \begin{itemize}
     \item \textbf{Ingesta:} API REST para \texttt{/transacciones} y \texttt{/precios} con validación, versión e \emph{idempotency keys}.
     \item \textbf{Procesamiento:} jobs programados (cron/Cloud Scheduler) que ejecutan el ETL y publican artefactos firmados.
-    \item \textbf{Presentación:} PBI continúa consumiendo CSV/Parquet; si hay lago de datos, se habilita \emph{Direct Lake}.
+    \item \textbf{Presentación:} Power BI capitaliza la ingesta del motor \emph{pyarrow} con Parquet nativo minimizando cuellos de botella semánticos; si se avanza a entornos Delta Lake, el sistema es compatible directamente con \emph{Direct Lake}.
 \end{itemize}
 
 % ========= 11. Gobernanza, seguridad y operación =========
