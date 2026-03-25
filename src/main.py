@@ -2,6 +2,7 @@ import logging
 from extract import extract_from_excel
 from transform import build_cartera_y_posiciones, calculate_exposures
 from load import save_to_parquet
+from visualize import generate_all_figures
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
@@ -22,6 +23,9 @@ def run_pipeline():
     save_to_parquet(posiciones, "posiciones_diarias")
     save_to_parquet(exp_ticker, "exposicion_ticker")
     save_to_parquet(exp_sector, "exposicion_sector")
+    
+    # 4. VISUALIZE (Figuras para paper académico)
+    generate_all_figures()
     
     logging.info("PIPELINE EJECUTADO EXITOSAMENTE")
 
