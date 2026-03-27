@@ -1,0 +1,146 @@
+/**
+ * ETL Fintech Pipeline — Architecture Diagram
+ * Render at: https://dreampuf.github.io/GraphvizOnline
+ * or: dot -Tpng architecture.dot -o architecture.png -Gdpi=300
+ */
+digraph ETL_Fintech {
+
+    // ── Graph-level settings ──────────────────────────────────────
+    label       = "Fintech ETL Pipeline — Columnar & Idempotent Architecture"
+    labelloc    = "t"
+    fontname    = "Helvetica"
+    fontsize    = 14
+    rankdir     = LR
+    splines     = ortho
+    ranksep     = 0.9
+    nodesep     = 0.5
+    bgcolor     = "#FAFAFA"
+    pad         = 0.4
+
+    // ── Default node style ────────────────────────────────────────
+    node [
+        shape    = box
+        style    = "rounded,filled"
+        fontname = "Helvetica"
+        fontsize = 10
+    ]
+
+    // ── Default edge style ────────────────────────────────────────
+    edge [
+        fontname = "Helvetica"
+        fontsize = 9
+        color    = "#555555"
+    ]
+
+    // ══════════════════════════════════════════════════════════════
+    // LAYER 1 — DATA SOURCE
+    // ══════════════════════════════════════════════════════════════
+    excel [
+        label     = "Data Source\nnuevo_dataset.xlsx\n─────────────────\nTransacciones | Precios | Índices"
+        fillcolor = "#E3F2FD"
+        color     = "#1565C0"
+        penwidth  = 1.5
+    ]
+
+    // ══════════════════════════════════════════════════════════════
+    // LAYER 2 — ETL MODULES  (clustered)
+    // ══════════════════════════════════════════════════════════════
+    subgraph cluster_etl {
+        label     = "ETL Pipeline  (src/)"
+        fontname  = "Helvetica"
+        fontsize  = 11
+        fontcolor = "#1B5E20"
+        style     = "rounded,dashed"
+        color     = "#81C784"
+        bgcolor   = "#F1F8E9"
+        margin    = 16
+
+        extract [
+            label     = "extract.py\n─────────────────\nRead Excel sheets\nNormalize columns\nSchema validation\nStructured logging"
+            fillcolor = "#DCEDC8"
+            color     = "#388E3C"
+        ]
+
+        transform [
+            label     = "transform.py\n─────────────────\nBuild daily positions\nCompute exposures\nPrice P&L returns\nIdempotent pipeline"
+            fillcolor = "#DCEDC8"
+            color     = "#388E3C"
+        ]
+
+        load [
+            label     = "load.py\n─────────────────\nSave to Parquet\nColumnar compression\n−80 % vs CSV\nSchema enforcement"
+            fillcolor = "#DCEDC8"
+            color     = "#388E3C"
+        ]
+    }
+
+    // ── Data Quality (cross-cutting concern) ──
+    dq [
+        label     = "Data Quality\n─────────────────\nNaN / Inf → 0.0\nDuplicate keys\nDate range check\nType consistency"
+        fillcolor = "#FFF9C4"
+        color     = "#F57F17"
+        style     = "rounded,filled,dashed"
+    ]
+
+    // ══════════════════════════════════════════════════════════════
+    // LAYER 3 — COLUMNAR STORAGE
+    // ══════════════════════════════════════════════════════════════
+    parquet [
+        label     = "Parquet Artifacts\ndata/out_parquet/\n─────────────────\ncartera_diaria\nposiciones_diarias\nexposicion_ticker\nexposicion_sector"
+        fillcolor = "#FFF3E0"
+        color     = "#E65100"
+        penwidth  = 1.5
+    ]
+
+    // ══════════════════════════════════════════════════════════════
+    // LAYER 4 — CONSUMERS
+    // ══════════════════════════════════════════════════════════════
+    visualize [
+        label     = "visualize.py\n─────────────────\n8 scientific figures\nMatplotlib / Seaborn\nDPI = 300 (PNG)"
+        fillcolor = "#FCE4EC"
+        color     = "#880E4F"
+    ]
+
+    powerbi [
+        label     = "Power BI\n─────────────────\nInteractive dashboards\nDAX measures\n3 thematic pages"
+        fillcolor = "#FCE4EC"
+        color     = "#880E4F"
+    ]
+
+    paper [
+        label     = "Scientific Paper\n─────────────────\nIEEE format (ES + EN)\nLatindex submission"
+        fillcolor = "#EDE7F6"
+        color     = "#4527A0"
+        style     = "rounded,filled"
+    ]
+
+    // ══════════════════════════════════════════════════════════════
+    // ORCHESTRATOR
+    // ══════════════════════════════════════════════════════════════
+    main [
+        label     = "main.py\nOrchestrator"
+        fillcolor = "#1A237E"
+        fontcolor = "white"
+        color     = "#0D47A1"
+        penwidth  = 2.0
+    ]
+
+    // ══════════════════════════════════════════════════════════════
+    // DATA FLOW EDGES
+    // ══════════════════════════════════════════════════════════════
+    excel      -> extract   [label = "  DataFrame"]
+    extract    -> transform [label = "  DataFrame"]
+    transform  -> load      [label = "  DataFrame"]
+    load       -> parquet   [label = "  .parquet files" color="#E65100" penwidth=1.5]
+
+    parquet    -> visualize [label = "  read_parquet()"]
+    parquet    -> powerbi   [label = "  native import"]
+    visualize  -> paper     [label = "  PNG DPI=300"]
+
+    // ── Control flow (dashed) ─────────────────────────────────────
+    dq   -> transform [style=dashed label="  validates" color="#F57F17"]
+    main -> extract   [style=dashed label="  calls" color="#5C6BC0"]
+    main -> transform [style=dashed                  color="#5C6BC0"]
+    main -> load      [style=dashed                  color="#5C6BC0"]
+    main -> visualize [style=dashed                  color="#5C6BC0"]
+}

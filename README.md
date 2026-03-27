@@ -4,12 +4,14 @@ Arquitectura columnar, modular e idempotente para el análisis de riesgo de port
 
 ## Arquitectura del Sistema y Flujo de Datos
 
+![Arquitectura del Pipeline](docs/data_analysis_in_Fintech/fig_esquema.png)
+
 El diseño sigue una separación estricta en tres capas, garantizando la **idempotencia** y la **reproducibilidad** total de los datos.
 
 1. **Capa de Ingesta (Extract)**
-   - **Fuente de Datos:** Hojas de cálculo publicadas (Google Sheets) extraídas en formato CSV.
-   - **Lectura Robusta:** Implementación de peticiones HTTP con mecanismos de reintento (`retries`), control de caché (`cache-busting` vía timestamps) y normalización automática de las columnas al español.
-   - **Contratos de Datos:** Diccionarios predefinidos garantizan compatibilidad hacia atrás y reglas sobre dominios de datos (fechas validables, transacciones numéricas tipificadas como ingresos o ventas netas).
+   - **Fuente de Datos:** Hojas de cálculo locales (`nuevo_dataset.xlsx`) con múltiples pestañas.
+   - **Lectura Robusta:** Extracción mediante `pandas` validando la existencia de pestañas base (Transacciones, Precios, Índices) y normalización automática de las columnas al español.
+   - **Contratos de Datos:** Diccionarios predefinidos garantizan compatibilidad hacia atrás y reglas sobre dominios de datos (fechas validables, numéricas tipificadas).
 
 2. **Capa de Procesamiento (Transform)**
    - **Idempotencia Vectorizada:** Ejecuciones secuenciales sobre el mismo set resultan estrictamente en las mismas métricas sin generar duplicados u operaciones huérfanas o con estado mutable. 
@@ -17,9 +19,10 @@ El diseño sigue una separación estricta en tres capas, garantizando la **idemp
    - **Densificación de Fechas:** Reconstrucción ininterrumpida de todo el calendario temporal para poder comparar fidedignamente la cartera contra los índices (*benchmarks*).
    - **Saneo Matemático Universal:** Prevención estricta de divisiones por cero o ruido analítico, al aislar transiciones sin capital previo, sanear valores `NaN` e `Inf`, y rebasear los acumulados relacionales a 1.0.
 
-3. **Capa de Salida (Load)**
-   - **Artefactos Columnares (Apache Parquet):** Exportación en módulos supercomprimidos independientes (`cartera_diaria.parquet`, `posiciones_diarias.parquet`, etc.). Esto comprime el peso de lectura un $80\%$ y preserva los *types* nativos evitando costosos pasos de formateo cruzado (*Power Query*) en los reportes de BI.
-   - **Trazabilidad de la Calidad:** Modelado preparado para adjuntar reportes de Data Quality y `hashes` por artefacto, posibilitando auditoría continua.
+3. **Capa de Salida (Load y Visualize)**
+   - **Artefactos Columnares (Apache Parquet):** Exportación en módulos supercomprimidos independientes (`cartera_diaria`, `posiciones`, etc.). Comprime el peso de lectura un $80\%$ y preserva los *types* nativos evitando costosos pasos de formateo cruzado en BI.
+   - **Módulo de Visualización Científica:** `visualize.py` genera automáticamente 8 figuras exploratorias en alta resolución (DPI=300) listas para publicación académica o adjuntar al reporte.
+   - **Trazabilidad de la Calidad:** Modelado preparado para adjuntar reportes de Data Quality y auditar la integridad.
 
 ## Métricas Financieras y de Riesgo
 
@@ -51,8 +54,9 @@ python src/main.py
 
 ## Publicación Científica Oficial
 La fundamentación teórica de este framework, su optimización matemática y escalamiento hacia Parquet se documentan de forma académica a través de nuestros Manuscritos de Investigación:
-- 🇺🇸 [**English Version (PDF):** Columnar and Idempotent Architecture for Financial Risk Analysis](docs/Reasco_Columnar_Idempotent_Architecture_2026.pdf)
-- 🇪🇸 [**Versión en Español (PDF):** Arquitectura Columnar e Idempotente para Análisis de Riesgo Financiero](docs/Reasco_Arquitectura_Columnar_2026.pdf)
+- **[EN PDF: Columnar and Idempotent Architecture for Financial Risk Analysis](docs/Reasco_Columnar_Idempotent_Architecture_2026.pdf)**
+- **[ES PDF: Arquitectura Columnar e Idempotente para Análisis de Riesgo Financiero](docs/Reasco_Arquitectura_Columnar_2026.pdf)**
+- **[EN Word/Forex Journal Format: Columnar and Idempotent Architecture for Financial Risk Analysis](docs/ETSA_Reasco_Columnar_Idempotent_Architecture_2026.pdf)**
 
 > **Reproducibilidad Garantizada:** El código fuente completo, orquestador modular temporal y artefactos de visualización se encuentran preservados de forma íntegra en nuestro repositorio público: [**https://github.com/faritreascodev/fintech-etl-pipeline**](https://github.com/faritreascodev/fintech-etl-pipeline).
 
