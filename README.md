@@ -55,7 +55,7 @@ python src/main.py
 ## Publicación Científica Oficial
 La fundamentación teórica de este framework, su optimización matemática y escalamiento hacia Parquet se documentan de forma académica a través de nuestros Manuscritos de Investigación:
 - **[EN PDF: Columnar and Idempotent Architecture for Financial Risk Analysis](docs/Reasco_Columnar_Idempotent_Architecture_2026.pdf)**
-- **[ES PDF: Arquitectura Columnar e Idempotente para Análisis de Riesgo Financiero](docs/Reasco_Arquitectura_Columnar_2026.pdf)**
+- **[ES PDF: Arquitectura Columnar e Idempotente para Análisis de Riesgo Financiero](docs/Reasco_Arquitectura_Idempotente_Portafolios_2026.pdf)**
 - **[EN Word/Forex Journal Format: Columnar and Idempotent Architecture for Financial Risk Analysis](docs/ETSA_Reasco_Columnar_Idempotent_Architecture_2026.pdf)**
 
 > **Reproducibilidad Garantizada:** El código fuente completo, orquestador modular temporal y artefactos de visualización se encuentran preservados de forma íntegra en nuestro repositorio público: [**https://github.com/faritreascodev/fintech-etl-pipeline**](https://github.com/faritreascodev/fintech-etl-pipeline).
