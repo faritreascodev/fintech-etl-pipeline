@@ -1,17 +1,7 @@
 """
-visualize.py — Módulo de Visualización para Paper Académico
-=============================================================
-Motor de gráficos de alta resolución (DPI=300) diseñado para
-publicación científica. Carga los artefactos Parquet ya generados
-y produce 8 figuras auditadas, con manejo seguro de datos vacíos.
-
-Auditoría de bugs corregidos:
-  - Drawdown: fórmula correcta (v_actual / max_historico_acumulado) - 1
-  - Benchmark: rebasing estricto en la misma fecha de inicio del portafolio
-  - Merge de fechas: se castea a datetime64[ns] antes de cruzar
-  - Tipos mixtos: se convierte a float64 con errors='coerce' antes de pct_change()
-  - Gráfico vacío: bloque if not df.empty antes de cada savefig()
-
+visualize.py
+Generación de figuras científicas a partir de los artefactos Parquet del ETL.
+Produce 8 figuras en DPI=300 para publicación académica.
 Autor: Farit Alexander Reasco Torres — PUCESE (2026)
 """
 
@@ -25,11 +15,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import seaborn as sns
 
-matplotlib.use("Agg")   # Backend no interactivo; obligatorio para servidores/CI
+matplotlib.use("Agg")
 warnings.filterwarnings("ignore", category=FutureWarning)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# ── Estilo global de publicación ──────────────────────────────────────────────
 plt.rcParams.update({
     "figure.facecolor":  "#FFFFFF",
     "axes.facecolor":    "#F8F8F8",
@@ -46,17 +34,12 @@ plt.rcParams.update({
     "ytick.labelsize":   8,
 })
 
-FIG_DIR   = "docs/data_analysis_in_Fintech"
-DPI       = 300
-PALETTE   = sns.color_palette("tab10")
+FIG_DIR = "docs/data_analysis_in_Fintech"
+DPI     = 300
+PALETTE = sns.color_palette("tab10")
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# HELPERS
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _save(fig: plt.Figure, nombre: str) -> None:
-    """Guarda con DPI=300, bbox_inches='tight' y cierra la figura."""
     os.makedirs(FIG_DIR, exist_ok=True)
     ruta = os.path.join(FIG_DIR, nombre)
     fig.savefig(ruta, dpi=DPI, bbox_inches="tight")
@@ -65,7 +48,6 @@ def _save(fig: plt.Figure, nombre: str) -> None:
 
 
 def _load_parquet(nombre: str, out_dir: str = "data/out_parquet") -> pd.DataFrame:
-    """Carga un Parquet y castea la columna 'fecha' a datetime."""
     ruta = os.path.join(out_dir, f"{nombre}.parquet")
     if not os.path.exists(ruta):
         logging.warning(f"Artefacto no encontrado: {ruta}")
@@ -76,84 +58,59 @@ def _load_parquet(nombre: str, out_dir: str = "data/out_parquet") -> pd.DataFram
     return df
 
 
-def _safe_float(series: pd.Series) -> pd.Series:
-    """Convierte cualquier serie a float64 limpiando strings mixtos."""
-    return pd.to_numeric(series, errors="coerce").astype(float)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FIG 1: Rendimiento acumulado vs Benchmark
-# ─────────────────────────────────────────────────────────────────────────────
-
 def fig_portafolio_vs_benchmark(cartera: pd.DataFrame, indices: pd.DataFrame) -> None:
     """
-    BUG AUDITADO:
-      - Se castean las fechas en ambos DataFrames antes del merge.
-      - El benchmark se rebasa EXACTAMENTE en la primera fecha activa del portafolio
-        (no en la primera fila del índice).
-      - pct_change() se aplica sobre float64.
+    Rendimiento acumulado del portafolio vs. índice de referencia.
+    Usa el campo 'acumulado' calculado en transform.py (idempotente, con retornos
+    seguros) para evitar recalcular desde valor_cartera bruto. El benchmark se
+    rebasa en la primera fecha activa del portafolio.
     """
     if cartera.empty:
         logging.error("fig1: cartera vacía — figura omitida.")
         return
 
-    # Asegurar float
     cartera = cartera.copy()
-    cartera["valor_cartera"] = _safe_float(cartera["valor_cartera"])
     cartera["fecha"] = pd.to_datetime(cartera["fecha"], errors="coerce")
+    cartera["acumulado"] = pd.to_numeric(cartera["acumulado"], errors="coerce")
 
-    # Retorno portafolio agregado (todas las cuentas juntas)
     port = (
-        cartera.groupby("fecha")["valor_cartera"]
-        .sum()
+        cartera.groupby("fecha")["acumulado"]
+        .mean()
         .sort_index()
     )
-    # Primera fecha con valor real
+
     primera_fecha = port[port > 0].index.min()
     if pd.isna(primera_fecha):
         logging.error("fig1: portafolio sin valor positivo — figura omitida.")
         return
 
-    port_retorno = port.pct_change().fillna(0.0).replace([np.inf, -np.inf], 0.0)
-    port_acum = (1 + port_retorno).cumprod()
-    # Rebasing desde fecha activa
-    base = port_acum.loc[primera_fecha]
-    port_acum = port_acum / base
-
     fig, ax = plt.subplots(figsize=(7.5, 3.5))
-    ax.plot(port_acum.index, port_acum.values, lw=1.6, color=PALETTE[0], label="Portafolio")
+    ax.plot(port.index, port.values, lw=1.6, color=PALETTE[0], label="Portafolio")
 
-    # Benchmark
-    if not indices.empty and "fecha" in indices.columns:
+    if not indices.empty:
         idx = indices.copy()
         idx["fecha"] = pd.to_datetime(idx["fecha"], errors="coerce")
-
-        # Seleccionar primera columna de precio disponible
-        precio_cols = [c for c in idx.columns if c not in ("fecha", "ticker", "nombre")]
-        if not precio_cols and "cierre" in idx.columns:
-            precio_cols = ["cierre"]
-
-        for col in precio_cols[:1]:
-            idx[col] = _safe_float(idx[col])
+        precio_col = next(
+            (c for c in ["indice", "cierre", "close", "precio", "value"]
+             if c in idx.columns),
+            None
+        )
+        if precio_col:
+            idx[precio_col] = pd.to_numeric(idx[precio_col], errors="coerce")
             bench = (
-                idx.set_index("fecha")[col]
+                idx.set_index("fecha")[precio_col]
                 .sort_index()
                 .reindex(port.index)
                 .ffill()
                 .bfill()
             )
-            bench_ret = bench.pct_change().fillna(0.0).replace([np.inf, -np.inf], 0.0)
-            bench_acum = (1 + bench_ret).cumprod()
-            # Rebasing en la MISMA fecha que el portafolio
-            if primera_fecha in bench_acum.index:
-                base_b = bench_acum.loc[primera_fecha]
-            else:
-                base_b = bench_acum.iloc[0]
-            bench_acum = bench_acum / base_b
-            ax.plot(bench_acum.index, bench_acum.values, lw=1.2,
-                    color=PALETTE[1], linestyle="--", label=f"Índice ({col})")
+            base_b = bench.loc[primera_fecha] if primera_fecha in bench.index else bench.iloc[0]
+            bench_norm = bench / base_b
+            ax.plot(bench_norm.index, bench_norm.values, lw=1.2,
+                    color=PALETTE[1], linestyle="--", label=f"Índice ({precio_col})")
+        else:
+            logging.warning("fig1: no se encontró columna de precios en la hoja indices.")
 
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1, decimals=0))
     ax.set_title("Rendimiento Acumulado: Portafolio vs. Índice de Referencia")
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Rendimiento Acumulado (base = 1)")
@@ -161,17 +118,14 @@ def fig_portafolio_vs_benchmark(cartera: pd.DataFrame, indices: pd.DataFrame) ->
     _save(fig, "fig_portafolio_vs_benchmark.png")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FIG 2: Exposición por sector (Donut)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def fig_donut_sector(exp_sector: pd.DataFrame) -> None:
+    """Composición sectorial del portafolio como peso promedio."""
     if exp_sector.empty:
         logging.error("fig2: exposición_sector vacía — figura omitida.")
         return
 
     df = exp_sector.copy()
-    df["peso"] = _safe_float(df["peso"])
+    df["peso"] = pd.to_numeric(df["peso"], errors="coerce")
     agg = df.groupby("sector")["peso"].mean().sort_values(ascending=False)
     agg = agg[agg > 0]
 
@@ -194,17 +148,14 @@ def fig_donut_sector(exp_sector: pd.DataFrame) -> None:
     _save(fig, "fig_donut_sector.png")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FIG 3: Distribución de retornos diarios (Histograma)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def fig_hist_retornos(cartera: pd.DataFrame) -> None:
+    """Distribución empírica de retornos diarios por cuenta."""
     if cartera.empty:
         logging.error("fig3: cartera vacía — figura omitida.")
         return
 
     df = cartera.copy()
-    df["retorno"] = _safe_float(df["retorno"])
+    df["retorno"] = pd.to_numeric(df["retorno"], errors="coerce")
     df = df.dropna(subset=["retorno"])
     df = df[np.isfinite(df["retorno"]) & (df["retorno"] != 0)]
 
@@ -225,17 +176,14 @@ def fig_hist_retornos(cartera: pd.DataFrame) -> None:
     _save(fig, "fig_hist_retornos.png")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FIG 4: Retornos por cuenta (Boxplots)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def fig_box_retornos(cartera: pd.DataFrame) -> None:
+    """Dispersión de retornos diarios por cuenta (boxplot)."""
     if cartera.empty:
         logging.error("fig4: cartera vacía — figura omitida.")
         return
 
     df = cartera.copy()
-    df["retorno"] = _safe_float(df["retorno"])
+    df["retorno"] = pd.to_numeric(df["retorno"], errors="coerce")
     df = df.dropna(subset=["retorno"])
     df = df[np.isfinite(df["retorno"]) & (df["retorno"] != 0)]
 
@@ -244,10 +192,10 @@ def fig_box_retornos(cartera: pd.DataFrame) -> None:
         return
 
     fig, ax = plt.subplots(figsize=(7, 3.5))
-    cuentas = sorted(df["cuenta_id"].unique())
     sns.boxplot(
         data=df, x="cuenta_id", y="retorno",
-        order=cuentas, palette="tab10", ax=ax,
+        order=sorted(df["cuenta_id"].unique()),
+        palette="tab10", ax=ax,
         flierprops=dict(marker=".", markersize=3, alpha=0.4),
     )
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1, decimals=1))
@@ -257,18 +205,19 @@ def fig_box_retornos(cartera: pd.DataFrame) -> None:
     _save(fig, "fig_box_retornos.png")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FIG 5: Volatilidad móvil 21 días (anualizada)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def fig_vol_rolling(cartera: pd.DataFrame) -> None:
+    """
+    Volatilidad móvil anualizada (ventana 21 días de trading).
+    Se aplica únicamente sobre el campo 'retorno' calculado por transform.py,
+    que ya excluye transiciones sin capital previo.
+    """
     if cartera.empty:
         logging.error("fig5: cartera vacía — figura omitida.")
         return
 
     df = cartera.copy()
-    df["retorno"] = _safe_float(df["retorno"])
-    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+    df["retorno"] = pd.to_numeric(df["retorno"], errors="coerce")
+    df["fecha"]   = pd.to_datetime(df["fecha"], errors="coerce")
 
     fig, ax = plt.subplots(figsize=(7.5, 3.5))
     ploteado = False
@@ -277,7 +226,7 @@ def fig_vol_rolling(cartera: pd.DataFrame) -> None:
         g = g.sort_values("fecha").set_index("fecha")
         vol = (
             g["retorno"]
-            .rolling(21, min_periods=10)
+            .rolling(21, min_periods=15)
             .std()
             .mul(np.sqrt(252))
         )
@@ -300,21 +249,17 @@ def fig_vol_rolling(cartera: pd.DataFrame) -> None:
     _save(fig, "fig_vol_rolling.png")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FIG 6: Retornos mensuales (heatmap de calendario)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def fig_retornos_mensuales(cartera: pd.DataFrame) -> None:
+    """Rendimiento mensual del portafolio agregado (producto de retornos diarios)."""
     if cartera.empty:
         logging.error("fig6: cartera vacía — figura omitida.")
         return
 
     df = cartera.copy()
-    df["retorno"] = _safe_float(df["retorno"])
-    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+    df["retorno"] = pd.to_numeric(df["retorno"], errors="coerce")
+    df["fecha"]   = pd.to_datetime(df["fecha"], errors="coerce")
     df = df.dropna(subset=["fecha", "retorno"])
 
-    # Retorno agregado (todas las cuentas, por mes)
     df["anio_mes"] = df["fecha"].dt.to_period("M")
     mensual = (
         df.groupby("anio_mes")["retorno"]
@@ -330,7 +275,8 @@ def fig_retornos_mensuales(cartera: pd.DataFrame) -> None:
     mensual["anio"] = mensual["periodo"].dt.year
     mensual["mes"]  = mensual["periodo"].dt.month
     pivot = mensual.pivot(index="anio", columns="mes", values="retorno_mensual")
-    MESES_ES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+    MESES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
+                "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
     pivot.columns = [MESES_ES[m - 1] for m in pivot.columns]
 
     fig, ax = plt.subplots(figsize=(10, max(2.5, len(pivot) * 0.8)))
@@ -345,24 +291,18 @@ def fig_retornos_mensuales(cartera: pd.DataFrame) -> None:
     _save(fig, "fig_retornos_mensuales.png")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FIG 7: Curva de Drawdown
-# ─────────────────────────────────────────────────────────────────────────────
-
 def fig_drawdown(cartera: pd.DataFrame) -> None:
     """
-    BUG AUDITADO:
-      - Fórmula: dd = (valor_actual / max_historico_acumulado) - 1
-      - Si valor_cartera llega en 0, se ignora con where(port > 0).
-      - El max acumulado se calcula con expanding().max() sobre la serie float.
+    Curva de drawdown: distancia porcentual del valor actual respecto al
+    máximo histórico acumulado. Fórmula: (V_actual / max_acumulado) - 1.
     """
     if cartera.empty:
         logging.error("fig7: cartera vacía — figura omitida.")
         return
 
     df = cartera.copy()
-    df["valor_cartera"] = _safe_float(df["valor_cartera"])
-    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+    df["valor_cartera"] = pd.to_numeric(df["valor_cartera"], errors="coerce")
+    df["fecha"]         = pd.to_datetime(df["fecha"], errors="coerce")
 
     port = (
         df.groupby("fecha")["valor_cartera"]
@@ -370,7 +310,7 @@ def fig_drawdown(cartera: pd.DataFrame) -> None:
         .sort_index()
         .astype(float)
     )
-    port = port[port > 0]   # Eliminar fechas sin capital
+    port = port[port > 0]
 
     if port.empty:
         logging.error("fig7: portafolio sin valor positivo — figura omitida.")
@@ -380,7 +320,7 @@ def fig_drawdown(cartera: pd.DataFrame) -> None:
     drawdown = (port / max_acum) - 1.0
     drawdown = drawdown.replace([np.inf, -np.inf], np.nan).dropna()
 
-    if drawdown.empty or drawdown.isna().all():
+    if drawdown.empty:
         logging.error("fig7: drawdown sin datos válidos — figura omitida.")
         return
 
@@ -396,23 +336,14 @@ def fig_drawdown(cartera: pd.DataFrame) -> None:
     _save(fig, "fig_drawdown.png")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FIG 8: Top-10 Tickers por valor promedio
-# ─────────────────────────────────────────────────────────────────────────────
-
 def fig_top10_tickers(exp_ticker: pd.DataFrame) -> None:
-    """
-    BUG AUDITADO:
-      - Se agrega valor_promedio a nivel global (sin filtrar por cuenta_id)
-        para evitar que las barras aparezcan vacías cuando hay una sola cuenta.
-      - Se castea a float antes de ordenar.
-    """
+    """Top-10 activos por valor promedio de posición durante el período analizado."""
     if exp_ticker.empty:
         logging.error("fig8: exposición_ticker vacía — figura omitida.")
         return
 
     df = exp_ticker.copy()
-    df["valor_promedio"] = _safe_float(df["valor_promedio"])
+    df["valor_promedio"] = pd.to_numeric(df["valor_promedio"], errors="coerce")
     df = df.dropna(subset=["valor_promedio"])
     df = df[df["valor_promedio"] > 0]
 
@@ -428,8 +359,9 @@ def fig_top10_tickers(exp_ticker: pd.DataFrame) -> None:
     )
 
     fig, ax = plt.subplots(figsize=(6.5, 4))
-    colors = sns.color_palette("Blues_d", len(top))
-    bars = ax.barh(top.index, top.values, color=colors, edgecolor="white")
+    bars = ax.barh(top.index, top.values,
+                   color=sns.color_palette("Blues_d", len(top)),
+                   edgecolor="white")
     ax.bar_label(bars, labels=[f"${v:,.0f}" for v in top.values],
                  padding=4, fontsize=7)
     ax.set_title("Top 10 Tickers por Valor Promedio de Posición")
@@ -439,33 +371,27 @@ def fig_top10_tickers(exp_ticker: pd.DataFrame) -> None:
     _save(fig, "fig_top10_tickers.png")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ORQUESTADOR DE VISUALIZACIONES
-# ─────────────────────────────────────────────────────────────────────────────
-
 def generate_all_figures(out_parquet: str = "data/out_parquet") -> None:
-    """Carga todos los artefactos Parquet y dispara las 8 figuras."""
-    logging.info("Iniciando generación de figuras para el paper científico...")
+    """Carga artefactos Parquet y genera las 8 figuras del paper."""
+    logging.info("Iniciando generación de figuras.")
 
     cartera    = _load_parquet("cartera_diaria",    out_parquet)
     exp_ticker = _load_parquet("exposicion_ticker", out_parquet)
     exp_sector = _load_parquet("exposicion_sector", out_parquet)
 
-    # La hoja de índices no pasa por el ETL → se ingesta directamente
-    indices_path = "data/nuevo_dataset.xlsx"
     try:
-        indices = pd.read_excel(indices_path, sheet_name="indices")
+        indices = pd.read_excel("data/nuevo_dataset.xlsx", sheet_name="indices")
         indices.columns = [str(c).strip().lower() for c in indices.columns]
     except Exception as e:
         logging.warning(f"No se pudo cargar la hoja 'indices': {e}")
         indices = pd.DataFrame()
 
-    # Diagnóstico rápido
-    logging.info(f"cartera filas: {len(cartera)} | columnas: {list(cartera.columns)}")
-    logging.info(f"exp_ticker filas: {len(exp_ticker)}")
-    logging.info(f"exp_sector filas: {len(exp_sector)}")
     if not cartera.empty:
-        logging.info(f"valor_cartera stats:\n{cartera['valor_cartera'].describe()}")
+        logging.info(
+            f"cartera — filas: {len(cartera)} | "
+            f"cuentas: {cartera['cuenta_id'].nunique()} | "
+            f"rango: {cartera['fecha'].min().date()} → {cartera['fecha'].max().date()}"
+        )
 
     fig_portafolio_vs_benchmark(cartera, indices)
     fig_donut_sector(exp_sector)
@@ -480,4 +406,5 @@ def generate_all_figures(out_parquet: str = "data/out_parquet") -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     generate_all_figures()
