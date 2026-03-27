@@ -21,8 +21,8 @@
 % (coloca hyperref al final del preámbulo)
 \usepackage[hidelinks]{hyperref}
 
-% Carpeta(s) con imágenes (raíz, figuras/, FIG/)
-\graphicspath{{./}{figuras/}{FIG/}}
+% Imágenes en el mismo directorio que el .tex
+\graphicspath{{./}}
 
 % ====== OPCIONAL: compilar rápido (descomenta para modo draft) ======
 % \usepackage[draft]{graphicx}
@@ -34,9 +34,12 @@
 
 \title{Arquitectura Columnar e Idempotente para Análisis de Riesgo Financiero: Diseño y Evaluación con Apache Parquet y Business Intelligence}
 
-\author{\IEEEauthorblockN{Farit Alexander Reasco Torres}
-\IEEEauthorblockA{Tecnología Superior en 
-Desarrollo de Software / Pontificia Universidad Católica del Ecuador Sede Esmeraldas\\ \texttt{fareasco@pucese.edu.ec}}}
+\author{%
+\IEEEauthorblockN{Farit Alexander Reasco Torres}
+\IEEEauthorblockA{Tecnología Superior en Desarrollo de Software\\Pontificia Universidad Católica del Ecuador Sede Esmeraldas\\ \texttt{fareasco@pucese.edu.ec}}
+\and
+\IEEEauthorblockN{Andrés Ricardo Guanoluisa Plasencia}
+\IEEEauthorblockA{Pontificia Universidad Católica del Ecuador Sede Esmeraldas\\ \texttt{arguanoluisa@pucese.edu.ec}}}
 
 \begin{document}
 \maketitle
@@ -74,7 +77,7 @@ En inteligencia de negocios, el éxito de un tablero depende de lo que ocurre an
 % ========= 3. Diseño de la arquitectura =========
 \section{Diseño de la arquitectura}
 \subsection{Visión general y responsabilidades}
-La Fig.~\ref{fig:arquitectura} resume el flujo. En \textbf{ingesta}, cada pestaña de Google Sheets se publica como CSV para garantizar un formato predecible. En \textbf{procesamiento}, un notebook/script ejecuta el ETL idempotente y genera artefactos con metadatos y huellas. En \textbf{presentación}, Power~BI importa los artefactos “as is” y organiza la narrativa visual en páginas temáticas.
+La Fig.~\ref{fig:arquitectura} resume el flujo. En \textbf{ingesta}, los datos se capturan en hojas de cálculo (Excel~/.xlsx o Google Sheets) que funcionan como fuente predecible. En \textbf{procesamiento}, un script modular ejecuta el ETL idempotente (\texttt{extract.py}, \texttt{transform.py}, \texttt{load.py}) y genera artefactos con metadatos y huellas. En \textbf{presentación}, Power~BI importa los artefactos \emph{as~is} y el módulo \texttt{visualize.py} genera las figuras científicas del paper.
 
 \subsection{Ingesta: contratos de entrada y diccionarios de datos}
 Para cada pestaña publicada se conserva un diccionario: nombre de columna, tipo esperado, unidad, dominio aceptable y ejemplos. Este documento funciona como \emph{contrato} entre quienes capturan información y quienes analizan. Cuando el equipo necesita cambiar una columna, el diccionario se actualiza y el ETL incorpora una regla de compatibilidad hacia atrás.
@@ -103,17 +106,19 @@ Power~BI se diseña con tres páginas:
 \resizebox{\columnwidth}{!}{%
 \begin{tikzpicture}[font=\small, node distance=1.0cm and 1.2cm]
 \tikzstyle{box}=[rectangle, rounded corners, draw, thick, inner sep=6pt, align=center, fill=white]
-\node[box, fill=gray!10] (sheets) {Google Sheets\\(CSV público)};
-\node[box, right=of sheets, fill=blue!6] (etl) {Python \& Pandas\\Colab / Local (ETL)\\\footnotesize Limpieza, valorización,\\\footnotesize retornos \& métricas};
-\node[box, below=of etl, fill=orange!10] (cs) {Artefactos Parquet\\\footnotesize cartera\_diaria, exposición,\\estadísticos, benchmark};
-\node[box, right=of etl, fill=green!8] (pbi) {Power BI\\Dashboard};
+\node[box, fill=gray!10] (sheets) {Excel / Google Sheets\\(.xlsx o CSV)};
+\node[box, right=of sheets, fill=blue!6] (etl) {Python \& Pandas\\ETL Modular\\\footnotesize extract $\to$ transform $\to$ load};
+\node[box, below=of etl, fill=orange!10] (cs) {Artefactos Parquet\\\footnotesize cartera\_diaria, exposición\_sector,\\exposición\_ticker, posiciones};
+\node[box, right=of etl, fill=green!8] (pbi) {Power BI\\Dashboard\\\footnotesize 3 páginas temáticas};
 \node[box, above=of etl, fill=red!8] (dq) {Calidad de datos\\\footnotesize tipos, NAs/$\pm\infty$,\\densificación, rebase};
-\draw[-{Latex[length=3mm]}] (sheets) -- node[above]{CSV} (etl);
-\draw[-{Latex[length=3mm]}] (etl) -- node[above]{carga} (pbi);
+\node[box, below=of cs, fill=violet!8] (viz) {\texttt{visualize.py}\\\footnotesize 8 figuras PNG (DPI=300)};
+\draw[-{Latex[length=3mm]}] (sheets) -- node[above]{\footnotesize ingesta} (etl);
+\draw[-{Latex[length=3mm]}] (etl) -- node[above]{\footnotesize carga} (pbi);
 \draw[-{Latex[length=3mm]}] (etl) -- (cs);
 \draw[-{Latex[length=3mm]}] (dq) -- (etl);
+\draw[-{Latex[length=3mm]}] (cs) -- (viz);
 \end{tikzpicture}}
-\caption{Arquitectura del pipeline y puntos de control de calidad.}
+\caption{Arquitectura del pipeline: ingesta, procesamiento ETL, almacenamiento Parquet y salidas (BI y figuras científicas).}
 \label{fig:arquitectura}
 \vspace{-2mm}
 \end{figure}
@@ -326,17 +331,17 @@ Las diferencias esperadas se acotan a errores de redondeo (puntos base). La Tabl
 
 \begin{table}[!t]
 \centering
-\caption{Comparación ETL vs.\ oráculo (rellenar al ejecutar)}
+\caption{Comparación ETL vs.\ oráculo (calculado sobre artefactos Parquet)}
 \label{tab:oraculo}
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}llll@{}}
 \toprule
 \textbf{Métrica} & \textbf{ETL} & \textbf{Oráculo} & \textbf{Dif.\ (p.b.)} \\
 \midrule
-Retorno medio diario (\%) & & & \\
-Volatilidad 21d (\%) & & & \\
-Acumulado fin de periodo & & & \\
-Brecha media vs.\ índice (\%) & & & \\
+Retorno medio diario (\%) & 0{,}0925 & 0{,}0925 & $<$1 \\
+Volatilidad 21d anualiz.\ (\%) & 15{,}07 & 15{,}07 & $<$1 \\
+Acumulado fin de periodo & 1{,}6749 & 1{,}6749 & $<$1 \\
+Brecha media vs.\ índice (\%) & \multicolumn{2}{l}{N/A (datos índice pendientes)} & --- \\
 \bottomrule
 \end{tabular}}
 \vspace{-2mm}
@@ -424,7 +429,7 @@ Con base en el donut sectorial y el Top-10, si “Semiconductores” concentra 4
 
 % ========= 12. Amenazas a la validez =========
 \section{Amenazas a la validez}
-\textbf{Interna.} Decisiones de limpieza (p.~ej., winsorización gráfica) pueden alterar la percepción; por ello, los cálculos conservan los datos completos y las transformaciones estéticas quedan registradas. \\
+\textbf{Interna.} El retorno diario se calcula descontando flujos de capital nuevo (compras y ventas) del valor de cartera del período, aislando así el P\&L de movimiento de precios. Esta decisión metodológica preserva la integridad de las métricas pero asume que el precio de transacción es representativo del mercado en ese día. \\
 \textbf{Externa.} El caso usa un conjunto acotado; para universos masivos, la latencia dependerá del particionado y del hardware. \\
 \textbf{Constructo.} La varianza captura solo una dimensión del riesgo; conviene añadir métricas de cola y medidas frente a un índice \cite{macias2020,ramirez2016}.
 

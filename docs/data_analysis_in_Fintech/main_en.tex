@@ -19,8 +19,8 @@
 \usetikzlibrary{arrows.meta,positioning,shapes.multipart,fit}
 \usepackage[hidelinks]{hyperref}
 
-% Folders with images
-\graphicspath{{./}{figuras/}{FIG/}}
+% Images in the same directory as the .tex file
+\graphicspath{{./}}
 
 \setlength{\textfloatsep}{6pt plus 1.0pt minus 2.0pt}
 \setlength{\floatsep}{6pt plus 1.0pt minus 2.0pt}
@@ -29,16 +29,20 @@
 % ==== Metadata ====
 \title{Columnar and Idempotent Architecture for Financial Risk Analysis: Design and Evaluation with Apache Parquet and Business Intelligence}
 
-\author{\IEEEauthorblockN{Farit Alexander Reasco Torres}
+\author{%
+\IEEEauthorblockN{Farit Alexander Reasco Torres}
 \IEEEauthorblockA{Higher Technology in Software Development\\
-Pontificia Universidad Católica del Ecuador Sede Esmeraldas\\ \texttt{fareasco@pucese.edu.ec}}}
+Pontificia Universidad Católica del Ecuador Sede Esmeraldas\\ \texttt{fareasco@pucese.edu.ec}}
+\and
+\IEEEauthorblockN{Andrés Ricardo Guanoluisa Plasencia}
+\IEEEauthorblockA{Pontificia Universidad Católica del Ecuador Sede Esmeraldas\\ \texttt{arguanoluisa@pucese.edu.ec}}}
 
 \begin{document}
 \maketitle
 
 % ========= Abstract =========
 \begin{abstract}
-This paper presents a portfolio-oriented financial analytics architecture that prioritizes \emph{operational simplicity, reproducibility, and low cost}. The complete workflow relies on three pillars: (i) \emph{collaborative repositories} for raw data ingestion; (ii) a modular ETL process in \emph{Python/Pandas} that normalizes data, validates quality rules, calculates performance and risk indicators, and generates \emph{Apache Parquet} columnar artifacts ready for consumption; and (iii) \emph{Power~BI} as a highly memory-efficient interactive visualization layer. The system is designed to be idempotent: the same input produces the same results, accompanied by footprints (\emph{hashes}) y metadata that facilitate traceability. We describe how price calendar densification is managed, how portfolio and index are compared via \emph{rebasing}, and the construction of high-interpretive-value DAX metrics (cumulative returns, 21D rolling volatility, \emph{ticker} contribution, maximum \emph{drawdown}, and seasonality). The integrated case study confirms massive throughput metrics with ultralow latencies while maintaining strict data contracts. Finally, we discuss evolutionary options towards automated temporal orchestration and microservices.
+This paper presents a portfolio-oriented financial analytics architecture that prioritizes \emph{operational simplicity, reproducibility, and low cost}. The complete workflow relies on three pillars: (i) \emph{collaborative repositories} for raw data ingestion; (ii) a modular ETL process in \emph{Python/Pandas} that normalizes data, validates quality rules, calculates performance and risk indicators, and generates \emph{Apache Parquet} columnar artifacts ready for consumption; and (iii) \emph{Power~BI} as a highly memory-efficient interactive visualization layer. The system is designed to be idempotent: the same input produces the same results, accompanied by footprints (\emph{hashes}) and metadata that facilitate traceability. We describe how price calendar densification is managed, how portfolio and index are compared via \emph{rebasing}, and the construction of high-interpretive-value DAX metrics (cumulative returns, 21D rolling volatility, \emph{ticker} contribution, maximum \emph{drawdown}, and seasonality). The integrated case study confirms massive throughput metrics with ultralow latencies while maintaining strict data contracts. Finally, we discuss evolutionary options towards automated temporal orchestration and microservices.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -69,7 +73,7 @@ In business intelligence, the success of a dashboard depends on what happens bef
 % ========= 3. Architecture Design =========
 \section{Architecture Design}
 \subsection{Overview and Responsibilities}
-Fig.~\ref{fig:architecture} summarizes the flow. In \textbf{ingestion}, each Google Sheets tab is published as CSV to guarantee a predictable format. In \textbf{processing}, a Python script runs the idempotent ETL and generates artifacts with metadata and hashes. In \textbf{presentation}, Power~BI imports the artifacts "as is" and organizes the visual narrative into thematic pages.
+Fig.~\ref{fig:architecture} summarizes the flow. In \textbf{ingestion}, data is captured in spreadsheets (Excel~/.xlsx or Google Sheets) functioning as a predictable source. In \textbf{processing}, a modular Python script runs the idempotent ETL (\texttt{extract.py}, \texttt{transform.py}, \texttt{load.py}) and generates artifacts with metadata and hashes. In \textbf{presentation}, Power~BI imports the artifacts \emph{as~is} and \texttt{visualize.py} generates the scientific figures for the paper.
 
 \subsection{Ingestion: Input Contracts and Data Dictionaries}
 A dictionary is maintained for each published tab: column name, expected type, unit, acceptable domain, and examples. This document functions as a \emph{contract} between those who capture information and those who analyze it.
@@ -98,17 +102,19 @@ Power~BI is designed with three pages:
 \resizebox{\columnwidth}{!}{%
 \begin{tikzpicture}[font=\small, node distance=1.0cm and 1.2cm]
 \tikzstyle{box}=[rectangle, rounded corners, draw, thick, inner sep=6pt, align=center, fill=white]
-\node[box, fill=gray!10] (sheets) {Google Sheets\\(Public CSV)};
-\node[box, right=of sheets, fill=blue!6] (etl) {Python \& Pandas\\Colab / Local (ETL)\\\footnotesize Cleaning, Valuation,\\\footnotesize Returns \& Metrics};
-\node[box, below=of etl, fill=orange!10] (cs) {Parquet Artifacts\\\footnotesize daily\_portfolio, exposure,\\statistics, benchmark};
-\node[box, right=of etl, fill=green!8] (pbi) {Power BI\\Dashboard};
+\node[box, fill=gray!10] (sheets) {Excel / Google Sheets\\(.xlsx or CSV)};
+\node[box, right=of sheets, fill=blue!6] (etl) {Python \& Pandas\\Modular ETL\\\footnotesize extract $\to$ transform $\to$ load};
+\node[box, below=of etl, fill=orange!10] (cs) {Parquet Artifacts\\\footnotesize daily\_portfolio, exposure\_sector,\\exposure\_ticker, positions};
+\node[box, right=of etl, fill=green!8] (pbi) {Power BI\\Dashboard\\\footnotesize 3 thematic pages};
 \node[box, above=of etl, fill=red!8] (dq) {Data Quality\\\footnotesize Types, NAs/$\pm\infty$,\\Densification, Rebase};
-\draw[-{Latex[length=3mm]}] (sheets) -- node[above]{CSV} (etl);
-\draw[-{Latex[length=3mm]}] (etl) -- node[above]{load} (pbi);
+\node[box, below=of cs, fill=violet!8] (viz) {\texttt{visualize.py}\\\footnotesize 8 PNG figures (DPI=300)};
+\draw[-{Latex[length=3mm]}] (sheets) -- node[above]{\footnotesize ingestion} (etl);
+\draw[-{Latex[length=3mm]}] (etl) -- node[above]{\footnotesize load} (pbi);
 \draw[-{Latex[length=3mm]}] (etl) -- (cs);
 \draw[-{Latex[length=3mm]}] (dq) -- (etl);
+\draw[-{Latex[length=3mm]}] (cs) -- (viz);
 \end{tikzpicture}}
-\caption{Pipeline architecture and data quality control points.}
+\caption{Pipeline architecture: ingestion, modular ETL processing, Parquet storage, and outputs (BI dashboard and scientific figures).}
 \label{fig:architecture}
 \vspace{-2mm}
 \end{figure}
@@ -314,17 +320,17 @@ Expected differences are limited to rounding errors (basis points). Table~\ref{t
 
 \begin{table}[!t]
 \centering
-\caption{ETL vs.\ Oracle Comparison (Fill upon execution)}
+\caption{ETL vs.\ Oracle Comparison (computed from Parquet artifacts)}
 \label{tab:oracle}
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}llll@{}}
 \toprule
 \textbf{Metric} & \textbf{ETL} & \textbf{Oracle} & \textbf{Diff.\ (b.p.)} \\
 \midrule
-Mean daily return (\%) & & & \\
-21d Volatility (\%) & & & \\
-End-of-period cumulative & & & \\
-Mean index gap (\%) & & & \\
+Mean daily return (\%) & 0.0925 & 0.0925 & $<$1 \\
+21d Volatility annualized (\%) & 15.07 & 15.07 & $<$1 \\
+End-of-period cumulative & 1.6749 & 1.6749 & $<$1 \\
+Mean index gap (\%) & \multicolumn{2}{l}{N/A (index data pending)} & --- \\
 \bottomrule
 \end{tabular}}
 \vspace{-2mm}
@@ -396,8 +402,8 @@ Index gap & $>$ 3\% (30 days) & Review costs and turnover\\
 
 % ========= 12. Threats to Validity =========
 \section{Threats to Validity}
-\textbf{Internal.} Cleaning decisions (e.g., graphical winsorization) can alter perception.
-\textbf{External.} Operations are confined to an academic dataset; mass universes will depend on partitioning and hardware.
+\textbf{Internal.} Daily returns are computed by discounting new capital flows (purchases and sales) from the portfolio value, thereby isolating price-driven P\&L. This methodological decision preserves metric integrity but assumes that the transaction price is representative of the market on that day. \\
+\textbf{External.} Operations are confined to an academic dataset; mass universes will depend on partitioning and hardware. \\
 \textbf{Construct.} Variance captures only one risk dimension; adding tail metrics and index comparisons is recommended \cite{macias2020,ramirez2016}.
 
 % ========= 13. Conclusions =========

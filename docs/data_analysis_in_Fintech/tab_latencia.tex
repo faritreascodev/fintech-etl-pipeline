@@ -1,13 +1,16 @@
-\begin{table}
-\caption{Latencia por etapa (5 repeticiones).}
+\begin{table}[!t]
+\centering
+\caption{Latencia por etapa del pipeline (5 repeticiones).}
 \label{tab:lat}
-\begin{tabular}{lrrl}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lrrl@{}}
 \toprule
-etapa & t\_prom\_s & cv\_\% & hash\_dataset \\
+\textbf{Etapa} & \textbf{t prom (s)} & \textbf{CV (\%)} & \textbf{Hash dataset} \\
 \midrule
-Extracción CSV & 0.003 & 5.200 & ee1922d0eec8 \\
-Transformación & 0.002 & 22.500 & ee1922d0eec8 \\
-Exportación & 0.003 & 9.900 & ee1922d0eec8 \\
+Extracción CSV & 0{,}003 & 5{,}2 & \texttt{ee1922d0eec8} \\
+Transformación & 0{,}002 & 22{,}5 & \texttt{ee1922d0eec8} \\
+Exportación    & 0{,}003 & 9{,}9  & \texttt{ee1922d0eec8} \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
+\vspace{-2mm}
 \end{table}
